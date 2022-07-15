@@ -40,21 +40,64 @@ impl Default for Account {
 }
 
 impl Account {
-    fn withdrawal(&mut self, amount: f64) {
-        if self.available_balance >= amount {
-            self.available_balance -= amount;
+    fn new(client_id: u16) -> Self {
+        Account {
+            transactions: HashMap::new(),
+            held_transactions: HashMap::new(),
+            frozen: false,
+            available_balance: 0.0,
+            client_id,
         }
     }
 
+    // withdrawal
+    // returns true if the withdrawal was successful
+    // decreasing the total and available amounts
+    fn withdrawal(&mut self, amount: f64) -> bool {
+        if self.available_balance >= amount {
+            self.available_balance -= amount;
+            true
+        } else {
+            false
+        }
+    }
+
+    // deposit funds, increasing the total and available amounts
     fn deposit(&mut self, amount: f64) {
         self.available_balance += amount;
     }
 
-    fn dispute(&mut self) {}
+    // the transaction goes to the held hashmap,
+    // the available amount should decrease
+    // the held amount should increase
+    // the total should stay the same
+    fn dispute(&mut self, disputed: Transaction) {
+        if let Some(transaction) = self.transactions.remove(&disputed.tx) {
+            self.available_balance -= transaction.amount;
+            self.held_transactions.insert(transaction.tx, transaction);
+        }
+    }
 
-    fn resolve(&mut self) {}
+    // the transaction goes to the held hashmap,
+    // the available amount should decrease
+    // the held amount should increase
+    // the total should stay the same
+    fn resolve(&mut self, resolved: Transaction) {
+        if let Some(transaction) = self.held_transactions.remove(&resolved.tx) {
+            self.available_balance += transaction.amount;
+            self.transactions.insert(transaction.tx, transaction);
+        }
+    }
 
-    fn chargeback(&mut self) {}
+    // the transaction goes to the held hashmap,
+    // the available amount should decrease
+    // the held amount should increase
+    // the total should stay the same
+    fn chargeback(&mut self, charged_back: Transaction) {
+        if let Some(_) = self.held_transactions.remove(&charged_back.tx) {
+            self.frozen = true;
+        }
+    }
 
     fn get_available_amount(&self) -> f64 {
         self.available_balance
@@ -77,13 +120,22 @@ impl Account {
         match transaction.r#type {
             TransactionType::Deposit => {
                 self.deposit(transaction.amount);
+                self.transactions.insert(transaction.tx, transaction);
             }
             TransactionType::Withdrawal => {
-                self.withdrawal(transaction.amount);
+                if self.withdrawal(transaction.amount) {
+                    self.transactions.insert(transaction.tx, transaction);
+                }
             }
-            TransactionType::Dispute => {}
-            TransactionType::Resolve => {}
-            TransactionType::Chargeback => {}
+            TransactionType::Dispute => {
+                self.dispute(transaction);
+            }
+            TransactionType::Resolve => {
+                self.resolve(transaction);
+            }
+            TransactionType::Chargeback => {
+                self.chargeback(transaction);
+            }
         }
     }
 
@@ -131,12 +183,11 @@ impl AccountManager {
             }
             None => {
                 // Create the account:
-                let mut new_account = Account::default();
-                let account_id = transaction.client;
+                let mut new_account = Account::new(transaction.client);
                 // then process the tx
                 new_account.process_transaction(transaction);
                 // save the account
-                self.accounts.insert(account_id, new_account);
+                self.accounts.insert(new_account.client_id, new_account);
             }
         }
     }
@@ -144,9 +195,9 @@ impl AccountManager {
 
 #[cfg(test)]
 mod tests {
-    use crate::account_manager::{Account, AccountManager};
+    use crate::account_manager::{Account, AccountManager, Transaction, TransactionType};
 
-    // extra function to expose the account for testing
+    // extra function for convenience
     impl AccountManager {
         fn _get_account(mut self, client: u16) -> Account {
             self.accounts
@@ -184,5 +235,215 @@ mod tests {
             test_round(account_manager._get_account(1).get_available_amount()),
             96.0409
         );
+    }
+
+    #[test]
+    fn test_deposit() {
+        let mut account = Account::new(1);
+        let trans1 = Transaction {
+            r#type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: 100.0,
+        };
+        account.transactions.insert(1, trans1);
+        account.deposit(100.0);
+        assert_eq!(account.available_balance, 100.0);
+        assert_eq!(account.get_total_amount(), 100.0);
+    }
+
+    #[test]
+    fn test_withdrawal() {
+        let mut account = Account::new(1);
+        let trans1 = Transaction {
+            r#type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: 100.0,
+        };
+        let trans2 = Transaction {
+            r#type: TransactionType::Withdrawal,
+            client: 1,
+            tx: 2,
+            amount: 50.0,
+        };
+        account.transactions.insert(1, trans1);
+        account.deposit(100.0);
+        assert_eq!(account.available_balance, 100.0);
+        assert_eq!(account.get_total_amount(), 100.0);
+        if account.withdrawal(trans2.amount) {
+            account.transactions.insert(1, trans2);
+        }
+        assert_eq!(account.available_balance, 50.0);
+        assert_eq!(account.get_total_amount(), 50.0);
+        assert_eq!(account.get_held_amount(), 0.0);
+    }
+
+    #[test]
+    fn test_failed_withdrawal() {
+        let mut account = Account::new(1);
+        let trans1 = Transaction {
+            r#type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: 100.0,
+        };
+        let trans2 = Transaction {
+            r#type: TransactionType::Withdrawal,
+            client: 1,
+            tx: 2,
+            amount: 150.0,
+        };
+        account.transactions.insert(1, trans1);
+        account.deposit(100.0);
+        assert_eq!(account.available_balance, 100.0);
+        assert_eq!(account.get_total_amount(), 100.0);
+        if account.withdrawal(trans2.amount) {
+            account.transactions.insert(1, trans2);
+        }
+        assert_eq!(account.available_balance, 100.0);
+        assert_eq!(account.get_total_amount(), 100.0);
+        assert_eq!(account.get_held_amount(), 0.0);
+    }
+
+    #[test]
+    fn test_dispute() {
+        let mut account = Account::new(1);
+        let trans1 = Transaction {
+            r#type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: 100.0,
+        };
+        let trans2 = Transaction {
+            r#type: TransactionType::Dispute,
+            client: 1,
+            tx: 1,
+            amount: 0.0,
+        };
+        account.transactions.insert(1, trans1);
+        account.deposit(100.0);
+        account.dispute(trans2);
+        assert_eq!(account.available_balance, 0.0);
+        assert_eq!(account.get_total_amount(), 100.0);
+        assert_eq!(account.get_held_amount(), 100.0);
+    }
+
+    #[test]
+    fn test_failed_dispute() {
+        let mut account = Account::new(1);
+        let trans1 = Transaction {
+            r#type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: 100.0,
+        };
+        let trans2 = Transaction {
+            r#type: TransactionType::Dispute,
+            client: 1,
+            tx: 0, // we are referring to a transaction that does not exist!
+            amount: 0.0,
+        };
+        account.transactions.insert(1, trans1);
+        account.deposit(100.0);
+        account.dispute(trans2);
+        assert_eq!(account.available_balance, 100.0);
+        assert_eq!(account.get_total_amount(), 100.0);
+        assert_eq!(account.get_held_amount(), 0.0);
+    }
+
+    #[test]
+    fn test_resolve() {
+        let mut account = Account::new(1);
+        let trans1 = Transaction {
+            r#type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: 100.0,
+        };
+        let trans2 = Transaction {
+            r#type: TransactionType::Dispute,
+            client: 1,
+            tx: 1,
+            amount: 0.0,
+        };
+        let trans3 = Transaction {
+            r#type: TransactionType::Dispute,
+            client: 1,
+            tx: 1,
+            amount: 0.0,
+        };
+        account.transactions.insert(1, trans1);
+        account.deposit(100.0);
+        account.dispute(trans2);
+        assert_eq!(account.get_held_amount(), 100.0);
+        account.resolve(trans3);
+        assert_eq!(account.available_balance, 100.0);
+        assert_eq!(account.get_total_amount(), 100.0);
+        assert_eq!(account.get_held_amount(), 0.0);
+    }
+
+    #[test]
+    fn test_failed_resolve() {
+        let mut account = Account::new(1);
+        let trans1 = Transaction {
+            r#type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: 100.0,
+        };
+        let trans2 = Transaction {
+            r#type: TransactionType::Dispute,
+            client: 1,
+            tx: 1,
+            amount: 0.0,
+        };
+        let trans3 = Transaction {
+            r#type: TransactionType::Dispute,
+            client: 1,
+            tx: 2, // we are referring to a transaction that does not exist!
+            amount: 0.0,
+        };
+        account.transactions.insert(1, trans1);
+        account.deposit(100.0);
+        account.dispute(trans2);
+        assert_eq!(account.get_held_amount(), 100.0);
+        account.resolve(trans3);
+        assert_eq!(account.available_balance, 0.0);
+        assert_eq!(account.get_total_amount(), 100.0);
+        assert_eq!(account.get_held_amount(), 100.0);
+    }
+
+    #[test]
+    fn test_chargeback() {
+        let mut account = Account::new(1);
+        let trans1 = Transaction {
+            r#type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: 100.0,
+        };
+        let trans2 = Transaction {
+            r#type: TransactionType::Dispute,
+            client: 1,
+            tx: 1,
+            amount: 0.0,
+        };
+        let trans3 = Transaction {
+            r#type: TransactionType::Chargeback,
+            client: 1,
+            tx: 1,
+            amount: 0.0,
+        };
+        account.transactions.insert(1, trans1);
+        account.deposit(100.0);
+        account.dispute(trans2);
+        assert_eq!(account.available_balance, 0.0);
+        assert_eq!(account.get_held_amount(), 100.0);
+        // chargeback
+        account.chargeback(trans3);
+        assert_eq!(account.available_balance, 0.0);
+        assert_eq!(account.get_total_amount(), 0.0);
+        assert_eq!(account.get_held_amount(), 0.0);
     }
 }
