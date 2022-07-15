@@ -453,5 +453,4 @@ mod tests {
         assert_eq!(account.get_held_amount(), 0.0);
         assert_eq!(account.frozen, true);
     }
-
 }

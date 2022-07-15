@@ -1,7 +1,7 @@
 mod account_manager;
 use crate::account_manager::AccountManager;
-use std::env;
 use csv::{ReaderBuilder, Trim};
+use std::env;
 
 fn main() {
     let mut args: Vec<String> = env::args().collect();
@@ -12,7 +12,8 @@ fn main() {
     let mut account_manager = AccountManager::default();
     // parse the csv
     let mut csv_reader = ReaderBuilder::new()
-    .trim(Trim::All).from_path(args.pop().expect("No valid file path provided"))
+        .trim(Trim::All)
+        .from_path(args.pop().expect("No valid file path provided"))
         .expect("CSV Reader faiuled to parse");
     for result in csv_reader.deserialize() {
         match result {
