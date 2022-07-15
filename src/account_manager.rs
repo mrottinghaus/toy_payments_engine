@@ -21,7 +21,7 @@ pub struct Transaction {
     r#type: TransactionType,
     client: u16,
     tx: u32,
-    amount: f64,
+    amount: Option<f64>,
 }
 
 pub struct Account {
@@ -78,7 +78,7 @@ impl Account {
     // the total should stay the same
     fn dispute(&mut self, disputed: Transaction) {
         if let Some(transaction) = self.transactions.remove(&disputed.tx) {
-            self.available_balance -= transaction.amount;
+            self.available_balance -= transaction.amount.unwrap_or(0.0);
             self.held_transactions.insert(transaction.tx, transaction);
         }
     }
@@ -89,7 +89,7 @@ impl Account {
     // the total should stay the same
     fn resolve(&mut self, resolved: Transaction) {
         if let Some(transaction) = self.held_transactions.remove(&resolved.tx) {
-            self.available_balance += transaction.amount;
+            self.available_balance += transaction.amount.unwrap_or(0.0);
             self.transactions.insert(transaction.tx, transaction);
         }
     }
@@ -111,7 +111,7 @@ impl Account {
     fn get_held_amount(&self) -> f64 {
         let mut total = 0.0;
         for value in self.held_transactions.values() {
-            total += value.amount;
+            total += value.amount.unwrap_or(0.0);
         }
         total
     }
@@ -124,11 +124,11 @@ impl Account {
     pub fn process_transaction(&mut self, transaction: Transaction) {
         match transaction.r#type {
             TransactionType::Deposit => {
-                self.deposit(transaction.amount);
+                self.deposit(transaction.amount.unwrap_or(0.0));
                 self.transactions.insert(transaction.tx, transaction);
             }
             TransactionType::Withdrawal => {
-                if self.withdrawal(transaction.amount) {
+                if self.withdrawal(transaction.amount.unwrap_or(0.0)) {
                     self.transactions.insert(transaction.tx, transaction);
                 }
             }
@@ -250,7 +250,7 @@ mod tests {
             r#type: TransactionType::Deposit,
             client: 1,
             tx: 1,
-            amount: 100.0,
+            amount: Some(100.0),
         };
         account.transactions.insert(1, trans1);
         account.deposit(100.0);
@@ -265,19 +265,19 @@ mod tests {
             r#type: TransactionType::Deposit,
             client: 1,
             tx: 1,
-            amount: 100.0,
+            amount: Some(100.0),
         };
         let trans2 = Transaction {
             r#type: TransactionType::Withdrawal,
             client: 1,
             tx: 2,
-            amount: 50.0,
+            amount: Some(50.0),
         };
         account.transactions.insert(1, trans1);
         account.deposit(100.0);
         assert_eq!(account.available_balance, 100.0);
         assert_eq!(account.get_total_amount(), 100.0);
-        if account.withdrawal(trans2.amount) {
+        if account.withdrawal(trans2.amount.unwrap_or(0.0)) {
             account.transactions.insert(1, trans2);
         }
         assert_eq!(account.available_balance, 50.0);
@@ -292,19 +292,19 @@ mod tests {
             r#type: TransactionType::Deposit,
             client: 1,
             tx: 1,
-            amount: 100.0,
+            amount: Some(100.0),
         };
         let trans2 = Transaction {
             r#type: TransactionType::Withdrawal,
             client: 1,
             tx: 2,
-            amount: 150.0,
+            amount: Some(150.0),
         };
         account.transactions.insert(1, trans1);
         account.deposit(100.0);
         assert_eq!(account.available_balance, 100.0);
         assert_eq!(account.get_total_amount(), 100.0);
-        if account.withdrawal(trans2.amount) {
+        if account.withdrawal(trans2.amount.unwrap_or(0.0)) {
             account.transactions.insert(1, trans2);
         }
         assert_eq!(account.available_balance, 100.0);
@@ -319,13 +319,13 @@ mod tests {
             r#type: TransactionType::Deposit,
             client: 1,
             tx: 1,
-            amount: 100.0,
+            amount: Some(100.0),
         };
         let trans2 = Transaction {
             r#type: TransactionType::Dispute,
             client: 1,
             tx: 1,
-            amount: 0.0,
+            amount: Some(0.0),
         };
         account.transactions.insert(1, trans1);
         account.deposit(100.0);
@@ -342,13 +342,13 @@ mod tests {
             r#type: TransactionType::Deposit,
             client: 1,
             tx: 1,
-            amount: 100.0,
+            amount: Some(100.0),
         };
         let trans2 = Transaction {
             r#type: TransactionType::Dispute,
             client: 1,
             tx: 0, // we are referring to a transaction that does not exist!
-            amount: 0.0,
+            amount: None,
         };
         account.transactions.insert(1, trans1);
         account.deposit(100.0);
@@ -365,19 +365,19 @@ mod tests {
             r#type: TransactionType::Deposit,
             client: 1,
             tx: 1,
-            amount: 100.0,
+            amount: Some(100.0),
         };
         let trans2 = Transaction {
             r#type: TransactionType::Dispute,
             client: 1,
             tx: 1,
-            amount: 0.0,
+            amount: None,
         };
         let trans3 = Transaction {
             r#type: TransactionType::Dispute,
             client: 1,
             tx: 1,
-            amount: 0.0,
+            amount: None,
         };
         account.transactions.insert(1, trans1);
         account.deposit(100.0);
@@ -396,19 +396,19 @@ mod tests {
             r#type: TransactionType::Deposit,
             client: 1,
             tx: 1,
-            amount: 100.0,
+            amount: Some(100.0),
         };
         let trans2 = Transaction {
             r#type: TransactionType::Dispute,
             client: 1,
             tx: 1,
-            amount: 0.0,
+            amount: None,
         };
         let trans3 = Transaction {
             r#type: TransactionType::Dispute,
             client: 1,
             tx: 2, // we are referring to a transaction that does not exist!
-            amount: 0.0,
+            amount: None,
         };
         account.transactions.insert(1, trans1);
         account.deposit(100.0);
@@ -427,19 +427,19 @@ mod tests {
             r#type: TransactionType::Deposit,
             client: 1,
             tx: 1,
-            amount: 100.0,
+            amount: Some(100.0),
         };
         let trans2 = Transaction {
             r#type: TransactionType::Dispute,
             client: 1,
             tx: 1,
-            amount: 0.0,
+            amount: None,
         };
         let trans3 = Transaction {
             r#type: TransactionType::Chargeback,
             client: 1,
             tx: 1,
-            amount: 0.0,
+            amount: None,
         };
         account.transactions.insert(1, trans1);
         account.deposit(100.0);
