@@ -1,6 +1,11 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+pub fn round(num: f64) -> f64 {
+    let temp = (num * 10000.0) as i32;
+    return temp as f64 / 10000.0;
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TransactionType {
@@ -145,9 +150,9 @@ impl Account {
         println!(
             "{:?}, {:?}, {:?}, {:?}, {:?}",
             self.client_id,
-            self.get_available_amount(),
-            self.get_held_amount(),
-            self.get_total_amount(),
+            round(self.get_available_amount()),
+            round(self.get_held_amount()),
+            round(self.get_total_amount()),
             self.frozen
         );
     }
@@ -168,9 +173,12 @@ impl Default for AccountManager {
 impl AccountManager {
     // output_accounts
     // outputs csv format to stdout
-    fn output_accounts(&self) {
+    pub fn output_accounts(&self) {
         println!("client, available, held, total, locked");
-        // TODO print all account info
+        // print all account info
+        for client in self.accounts.values() {
+            client.print();
+        }
     }
 
     // process_transaction
@@ -195,7 +203,7 @@ impl AccountManager {
 
 #[cfg(test)]
 mod tests {
-    use crate::account_manager::{Account, AccountManager, Transaction, TransactionType};
+    use crate::account_manager::{round, Account, AccountManager, Transaction, TransactionType};
 
     // extra function for convenience
     impl AccountManager {
@@ -204,11 +212,6 @@ mod tests {
                 .remove(&client)
                 .expect("Failed to get account!")
         }
-    }
-
-    fn test_round(num: f64) -> f64 {
-        let temp = (num * 10000.0) as i32;
-        return temp as f64 / 10000.0;
     }
 
     #[test]
@@ -232,7 +235,7 @@ mod tests {
             }
         }
         assert_eq!(
-            test_round(account_manager._get_account(1).get_available_amount()),
+            round(account_manager._get_account(1).get_available_amount()),
             96.0409
         );
     }

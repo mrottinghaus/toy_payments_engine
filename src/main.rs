@@ -15,7 +15,6 @@ fn main() {
     for result in csv_reader.deserialize() {
         match result {
             Ok(transaction) => {
-                println!("{:?}", transaction);
                 account_manager.process_transaction(transaction);
             }
             Err(error) => {
@@ -24,4 +23,5 @@ fn main() {
             }
         }
     }
+    account_manager.output_accounts();
 }
