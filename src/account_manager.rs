@@ -164,8 +164,8 @@ mod tests {
     fn test_basic_file_balances() {
         let mut account_manager = AccountManager::default();
         // parse the csv
-        let mut csv_reader = csv::Reader::from_path("testsingleclient.csv")
-            .expect("Failed to read input file testfile.csv");
+        let mut csv_reader = csv::Reader::from_path("testfiles/testsingleclient.csv")
+            .expect("Failed to read input file testfiles/testfile.csv");
         for result in csv_reader.deserialize() {
             // Notice that we need to provide a type hint for automatic
             // deserialization.
