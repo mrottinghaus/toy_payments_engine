@@ -187,7 +187,10 @@ impl AccountManager {
         // find the account
         match self.accounts.get_mut(&transaction.client) {
             Some(account) => {
-                account.process_transaction(transaction);
+                // do not process any more transactions if the account is frozen
+                if false == account.frozen {
+                    account.process_transaction(transaction);
+                }
             }
             None => {
                 // Create the account:
@@ -448,5 +451,7 @@ mod tests {
         assert_eq!(account.available_balance, 0.0);
         assert_eq!(account.get_total_amount(), 0.0);
         assert_eq!(account.get_held_amount(), 0.0);
+        assert_eq!(account.frozen, true);
     }
+
 }
