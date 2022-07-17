@@ -5,6 +5,7 @@ use std::env;
 mod account;
 mod account_manager;
 
+/// A toy payments engine that process transactions for multiple client accounts
 fn main() {
     let mut args: Vec<String> = env::args().collect();
     if args.len() < 2 {
