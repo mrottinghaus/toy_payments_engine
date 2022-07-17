@@ -1,7 +1,9 @@
-mod account_manager;
 use crate::account_manager::AccountManager;
 use csv::{ReaderBuilder, Trim};
 use std::env;
+
+mod account;
+mod account_manager;
 
 fn main() {
     let mut args: Vec<String> = env::args().collect();
