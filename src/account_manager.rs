@@ -1,6 +1,7 @@
 use crate::account::{Account, Transaction};
 use std::collections::HashMap;
 
+/// The Account Manager contains all of the accounts
 pub struct AccountManager {
     accounts: HashMap<u16, Account>,
 }
@@ -14,8 +15,7 @@ impl Default for AccountManager {
 }
 
 impl AccountManager {
-    // output_accounts
-    // outputs csv format to stdout
+    /// outputs csv format listing each account to stdout
     pub fn output_accounts(&self) {
         println!("client, available, held, total, locked");
         // print all account info
@@ -24,8 +24,15 @@ impl AccountManager {
         }
     }
 
-    // process_transaction
-    // process a single transaction, create a new account if it does not currently exist
+    /// process a single transaction, create a new account if it does not currently exist
+    /// The purpose is to find which account to apply the transaction to and then have that account run the transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `transaction` - The transaction to be processed an affect an account's balance
+    ///
+    /// # Examples
+    /// // TODO
     pub fn process_transaction(&mut self, transaction: Transaction) {
         // find the account
         match self.accounts.get_mut(&transaction.client) {
