@@ -34,21 +34,24 @@ impl AccountManager {
     /// # Examples
     /// // TODO
     pub fn process_transaction(&mut self, transaction: Transaction) {
-        // find the account
-        match self.accounts.get_mut(&transaction.client) {
-            Some(account) => {
-                // do not process any more transactions if the account is frozen
-                if false == account.is_frozen() {
-                    account.process_transaction(transaction);
+        // check the transaction
+        if let Some(transaction) = transaction.validate() {
+            // find the account
+            match self.accounts.get_mut(&transaction.client) {
+                Some(account) => {
+                    // do not process any more transactions if the account is frozen
+                    if false == account.is_frozen() {
+                        account.process_transaction(transaction);
+                    }
                 }
-            }
-            None => {
-                // Create the account:
-                let mut new_account = Account::new(transaction.client);
-                // then process the tx
-                new_account.process_transaction(transaction);
-                // save the account
-                self.accounts.insert(new_account.get_id(), new_account);
+                None => {
+                    // Create the account:
+                    let mut new_account = Account::new(transaction.client);
+                    // then process the tx
+                    new_account.process_transaction(transaction);
+                    // save the account
+                    self.accounts.insert(new_account.get_id(), new_account);
+                }
             }
         }
     }

@@ -8,7 +8,7 @@ pub fn round(num: f64) -> f64 {
 }
 
 /// The possible kinds of transactions that can be processed
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum TransactionType {
     Deposit,
@@ -25,6 +25,38 @@ pub struct Transaction {
     pub client: u16,
     pub tx: u32,
     pub amount: Option<f64>,
+}
+
+impl Transaction {
+    /// Validate a transaction
+    /// A transaction amount for a Withdrawal or Deposit is only valid
+    /// if the amount is Some and positive but finite.
+    /// This returns None if the transaction should be ignored and discarded
+    ///
+    /// # Note
+    /// if not doing a move is important for performance or memory usage,
+    /// this method can be changed to take &self and return a bool.
+    /// It is implemented this way to prevent using the transaction after it has been invalidated.
+    pub fn validate(self) -> Option<Self> {
+        // Amounts only apply to withdrawals and deposits
+        if (self.r#type == TransactionType::Withdrawal) || (self.r#type == TransactionType::Deposit)
+        {
+            match self.amount {
+                // The amount must not be None
+                Some(amount) => {
+                    // It must be some positive value
+                    if amount.is_normal() && amount.is_sign_positive() {
+                        Some(self)
+                    } else {
+                        None
+                    }
+                }
+                None => None,
+            }
+        } else {
+            Some(self)
+        }
+    }
 }
 
 /// Represents a single client's account information
@@ -205,6 +237,86 @@ impl Account {
 mod tests {
     use crate::account::{Account, Transaction, TransactionType};
 
+    // Test Transaction validation
+    #[test]
+    fn test_valid_transactions() {
+        let transaction = Transaction {
+            r#type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: Some(44.99),
+        };
+        assert!(transaction.validate().is_some());
+        let transaction = Transaction {
+            r#type: TransactionType::Withdrawal,
+            client: 1,
+            tx: 1,
+            amount: Some(44.99),
+        };
+        assert!(transaction.validate().is_some());
+        let transaction = Transaction {
+            r#type: TransactionType::Dispute,
+            client: 1,
+            tx: 1,
+            amount: None,
+        };
+        assert!(transaction.validate().is_some());
+        let transaction = Transaction {
+            r#type: TransactionType::Resolve,
+            client: 1,
+            tx: 1,
+            amount: None,
+        };
+        assert!(transaction.validate().is_some());
+        let transaction = Transaction {
+            r#type: TransactionType::Chargeback,
+            client: 1,
+            tx: 1,
+            amount: None,
+        };
+        assert!(transaction.validate().is_some());
+    }
+
+    #[test]
+    fn test_invalid_transaction_amounts() {
+        let transaction = Transaction {
+            r#type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: Some(-44.99),
+        };
+        assert!(transaction.validate().is_none());
+        let transaction = Transaction {
+            r#type: TransactionType::Withdrawal,
+            client: 1,
+            tx: 1,
+            amount: Some(-44.99),
+        };
+        assert!(transaction.validate().is_none());
+        let transaction = Transaction {
+            r#type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: Some(0.0),
+        };
+        assert!(transaction.validate().is_none());
+        let transaction = Transaction {
+            r#type: TransactionType::Withdrawal,
+            client: 1,
+            tx: 1,
+            amount: Some(f64::INFINITY),
+        };
+        assert!(transaction.validate().is_none());
+        let transaction = Transaction {
+            r#type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: None,
+        };
+        assert!(transaction.validate().is_none());
+    }
+
+    // Test Account
     #[test]
     fn test_deposit() {
         let mut account = Account::new(1);
