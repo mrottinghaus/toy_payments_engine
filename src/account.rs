@@ -1,11 +1,13 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Round an f64 to 4 decimal places of precision.
 pub fn round(num: f64) -> f64 {
     let temp = (num * 10000.0) as i32;
     return temp as f64 / 10000.0;
 }
 
+/// The possible kinds of transactions that can be processed
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TransactionType {
@@ -16,6 +18,7 @@ pub enum TransactionType {
     Chargeback,
 }
 
+/// Contains all information relevant to a single transaction
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Transaction {
     pub r#type: TransactionType,
@@ -24,6 +27,8 @@ pub struct Transaction {
     pub amount: Option<f64>,
 }
 
+/// Represents a single client's account information
+/// This should only contain transactions that apply to one client
 pub struct Account {
     transactions: HashMap<u32, Transaction>,
     held_transactions: HashMap<u32, Transaction>,
@@ -45,6 +50,11 @@ impl Default for Account {
 }
 
 impl Account {
+    /// Returns a new client account
+    ///
+    /// # Arguments
+    ///
+    /// * `client_id` - a unique u16 that identifies this client
     pub fn new(client_id: u16) -> Self {
         Account {
             transactions: HashMap::new(),
@@ -55,9 +65,13 @@ impl Account {
         }
     }
 
-    // withdrawal
-    // returns true if the withdrawal was successful
-    // decreasing the total and available amounts
+    /// Handle a withdrawal transaction type
+    /// returns true if the withdrawal was successful
+    /// decreasing the total and available amounts
+    ///
+    /// # Arguments
+    ///
+    /// * `amount` - a positive f64 of the amount to be subracted from the balance
     fn withdrawal(&mut self, amount: f64) -> bool {
         if self.available_balance >= amount {
             self.available_balance -= amount;
@@ -67,15 +81,21 @@ impl Account {
         }
     }
 
-    // deposit funds, increasing the total and available amounts
+    /// deposit funds, increasing the total and available amounts
+    /// # Arguments
+    ///
+    /// * `amount` - a positive f64 of the amount to be added to the balance
     fn deposit(&mut self, amount: f64) {
         self.available_balance += amount;
     }
 
-    // the transaction goes to the held hashmap,
-    // the available amount should decrease
-    // the held amount should increase
-    // the total should stay the same
+    /// the transaction goes to the held hashmap,
+    /// the available amount should decrease
+    /// the held amount should increase
+    /// the total should stay the same
+    /// # Arguments
+    ///
+    /// * `disputed` - the Disputed type Transaction to be processed
     fn dispute(&mut self, disputed: Transaction) {
         if let Some(transaction) = self.transactions.remove(&disputed.tx) {
             self.available_balance -= transaction.amount.unwrap_or(0.0);
@@ -83,10 +103,13 @@ impl Account {
         }
     }
 
-    // the transaction goes to the held hashmap,
-    // the available amount should decrease
-    // the held amount should increase
-    // the total should stay the same
+    /// the transaction goes to the held hashmap,
+    /// the available amount should decrease
+    /// the held amount should increase
+    /// the total should stay the same
+    /// # Arguments
+    ///
+    /// * `resolved` - the Resolve type Transaction to be processed
     fn resolve(&mut self, resolved: Transaction) {
         if let Some(transaction) = self.held_transactions.remove(&resolved.tx) {
             self.available_balance += transaction.amount.unwrap_or(0.0);
@@ -94,20 +117,25 @@ impl Account {
         }
     }
 
-    // the transaction goes to the held hashmap,
-    // the available amount should decrease
-    // the held amount should increase
-    // the total should stay the same
+    /// the transaction goes to the held hashmap,
+    /// the available amount decreases
+    /// the held amount increases
+    /// the total remains unchanged
+    /// # Arguments
+    ///
+    /// * `charged_back` - the Chargeback type Transaction to be processed
     fn chargeback(&mut self, charged_back: Transaction) {
         if let Some(_) = self.held_transactions.remove(&charged_back.tx) {
             self.frozen = true;
         }
     }
 
+    /// Return the amount available to the client
     pub fn get_available_amount(&self) -> f64 {
         self.available_balance
     }
 
+    /// Return the held amount - the total balance in dispute
     pub fn get_held_amount(&self) -> f64 {
         let mut total = 0.0;
         for value in self.held_transactions.values() {
@@ -116,19 +144,26 @@ impl Account {
         total
     }
 
+    /// Return the sum of the available balance and the funds held in dispute
     pub fn get_total_amount(&self) -> f64 {
         self.available_balance + self.get_held_amount()
     }
 
+    /// Returns true if the client's account is frozen and should not process transactions
     pub fn is_frozen(&self) -> bool {
         self.frozen
     }
 
+    /// Get the unique u16 identifier of the client
     pub fn get_id(&self) -> u16 {
         self.client_id
     }
 
-    // process a single transaction that applies to this account
+    /// Process a single transaction that applies to this account
+    /// This is the main functionality of an account
+    /// # Arguments
+    ///
+    /// * `charged_back` - the Chargeback type Transaction to be processed
     pub fn process_transaction(&mut self, transaction: Transaction) {
         match transaction.r#type {
             TransactionType::Deposit => {
@@ -152,9 +187,9 @@ impl Account {
         }
     }
 
-    // output the required csv fields for this account
+    /// output the required csv fields for this account
+    /// Returns the following fields: client, available, held, total, locked
     pub fn print(&self) {
-        // client, available, held, total, locked
         println!(
             "{:?}, {:?}, {:?}, {:?}, {:?}",
             self.client_id,
