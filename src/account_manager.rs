@@ -39,13 +39,13 @@ impl AccountManager {
     /// # Arguments
     ///
     /// * `transaction` - The transaction to be processed an affect an account's balance
-    /// 
+    ///
     /// // Doctests are not working for binaries, but you get an example anyway.
     /// # Example
     /// ```
     /// use account_manager::AccountManager;
     /// use account::Transaction;
-    /// 
+    ///
     /// // process a single transaction and print the result
     /// let transaction = Transaction {
     ///     r#type: TransactionType::Deposit,

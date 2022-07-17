@@ -125,13 +125,23 @@ impl Account {
     /// the available amount should decrease
     /// the held amount should increase
     /// the total should stay the same
+    /// This action shall only apply to Deposits
     /// # Arguments
     ///
     /// * `disputed` - the Disputed type Transaction to be processed
     fn dispute(&mut self, disputed: Transaction) {
+        // We have never specified that you could only dispute Deposits, however,
+        // we did define that a dispute will lower the available balance,
+        // and that a resolve increasing the available balance, so it would not make sense for this to apply to a withdrawal
         if let Some(transaction) = self.transactions.remove(&disputed.tx) {
-            self.available_balance -= transaction.amount.unwrap_or(0.0);
-            self.held_transactions.insert(transaction.tx, transaction);
+            if transaction.r#type == TransactionType::Deposit {
+                self.available_balance -= transaction.amount.unwrap_or(0.0);
+                self.held_transactions.insert(transaction.tx, transaction);
+            } else {
+                // Not a deposit. Why is it disputed?
+                // I am not sure how I feel about this, I could get a mutable reference and check the transaction, but I think this is more effecient.
+                self.transactions.insert(transaction.tx, transaction);
+            }
         }
     }
 
@@ -139,11 +149,13 @@ impl Account {
     /// the available amount should decrease
     /// the held amount should increase
     /// the total should stay the same
+    /// This action shall only apply to Deposits
     /// # Arguments
     ///
     /// * `resolved` - the Resolve type Transaction to be processed
     fn resolve(&mut self, resolved: Transaction) {
         if let Some(transaction) = self.held_transactions.remove(&resolved.tx) {
+            // Don't need to handle a check if it is a Deposit, a non-deposit should not end up in held transactions anyway
             self.available_balance += transaction.amount.unwrap_or(0.0);
             self.transactions.insert(transaction.tx, transaction);
         }
@@ -157,6 +169,7 @@ impl Account {
     ///
     /// * `charged_back` - the Chargeback type Transaction to be processed
     fn chargeback(&mut self, charged_back: Transaction) {
+        // Don't need to handle a check if it is a Deposit, a non-deposit should not end up in held transactions anyway
         if let Some(_) = self.held_transactions.remove(&charged_back.tx) {
             self.frozen = true;
         }
