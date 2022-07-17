@@ -86,10 +86,12 @@ impl AccountManager {
 mod tests {
     use crate::account::{round, Account};
     use crate::account_manager::AccountManager;
+    use csv::{ReaderBuilder, Trim};
+    use std::env;
 
     // extra function for convenience
     impl AccountManager {
-        fn _get_account(mut self, client: u16) -> Account {
+        fn get_account(&mut self, client: u16) -> Account {
             self.accounts
                 .remove(&client)
                 .expect("Failed to get account!")
@@ -117,8 +119,37 @@ mod tests {
             }
         }
         assert_eq!(
-            round(account_manager._get_account(1).get_available_amount()),
+            round(account_manager.get_account(1).get_available_amount()),
             96.0409
         );
+    }
+
+    #[test]
+    fn test_single_client() {
+        let mut args: Vec<String> = env::args().collect();
+        if args.len() < 2 {
+            println!("Usage: cargo run -- filename.csv > output.csv");
+            return;
+        }
+        let mut account_manager = AccountManager::default();
+        // parse the csv
+        let mut csv_reader = ReaderBuilder::new()
+            .trim(Trim::All)
+            .from_path(args.pop().expect("No valid file path provided"))
+            .expect("CSV Reader faiuled to parse");
+        for result in csv_reader.deserialize() {
+            match result {
+                Ok(transaction) => {
+                    account_manager.process_transaction(transaction);
+                }
+                Err(error) => {
+                    println!("Failed to deserialize a transaction: {:?}", error);
+                    return;
+                }
+            }
+        }
+        assert_eq!(account_manager._get_client_balance(&1), 201.0);
+        assert_eq!(account_manager.get_account(1).get_held_amount(), 1000.0);
+        assert_eq!(account_manager.get_account(1).is_frozen(), true);
     }
 }
